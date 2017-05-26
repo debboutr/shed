@@ -48,7 +48,9 @@ def mashGeoms(gdf,tup):
         clipd = MultiPolygon(polys)
     if tt1 and not tt2:
         print 'B'
-        pass
+        for n in a:
+            b = clipGeoms(n,b)
+        clipd = b
     if tt1 and tt2:    
         polys = []
         for m in b:
@@ -72,7 +74,15 @@ def fixOverlap(f,col):
 if __name__ == '__main__':
     
     loc ='/home/rick/projects/AdjacentBoundaryTool/overlapping'
-    fn = '%s/overlapping.shp' % loc
+    fn = '%s/overlapping2.shp' % loc
     column = 'NUM_IMAGES'
     out = fixOverlap(fn,column)
     out.to_file('%s/test.shp' % loc)
+
+#one = mashGeoms(shp,iss[0])
+#two = mashGeoms(one,iss[1])
+#thr = mashGeoms(two,iss[2])
+#fou = mashGeoms(thr,iss[3])
+#fiv = mashGeoms(fou,iss[4])
+#gdf = fiv.copy()
+#tup = iss[5]
