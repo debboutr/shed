@@ -6,7 +6,6 @@ Created on Thu May 25 00:41:33 2017
 @author: rick
 """
 
-import pandas as pd
 import geopandas as gpd
 from shapely.geometry import MultiPolygon
 
@@ -60,7 +59,7 @@ def mashGeoms(gdf,tup):
         clipd = MultiPolygon(polys)
     gdf.drop(tup[1],inplace=True)  
     new = gpd.GeoDataFrame(dc,index=[tup[1]],geometry=[clipd],crs=gdf.crs)     
-    return pd.concat([gdf,new]).sort_index()
+    return gdf.append(new).sort_index()
 
 def fixOverlap(f,col):
     shp = gpd.read_file(f)
@@ -74,7 +73,7 @@ def fixOverlap(f,col):
 if __name__ == '__main__':
     
     loc ='/home/rick/projects/AdjacentBoundaryTool/overlapping'
-    fn = '%s/overlapping2.shp' % loc
+    fn = '%s/overlapping.shp' % loc
     column = 'NUM_IMAGES'
     out = fixOverlap(fn,column)
     out.to_file('%s/test.shp' % loc)
