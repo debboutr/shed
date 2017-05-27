@@ -10,9 +10,9 @@ import geopandas as gpd
 from shapely.geometry import MultiPolygon
 
 def x_index(gdf):
-    # this one took me forever to figure out, 
-    # but I think its' the best way to find polys
-    # indexes to do operations on
+	'''Returns a list of tuples idntifying the geometries
+	that overlap one another.
+	'''
     xidxs = []
     for x in gdf.index.tolist()[:-1]:
         for y in range(x+1,len(gdf)):
@@ -23,15 +23,22 @@ def x_index(gdf):
     return xidxs
 
 def t_dict(d):
+	'''Creates a dictionary to pass to the GeoDataFrame instantiation 
+	'''
     g = {}
     for k in d:
         g[k] = [d[k]]
     return g
 
 def clipGeoms(geom1,geom2):
+	'''Returns a clipped version of geom 2
+	'''
     return geom2.difference(geom1)
 
 def mashGeoms(gdf,tup):
+	'''Modifies the overlapping geometries within the GeoDataFrame
+	at the indexes passed into tup.
+	'''
     clip = gdf.ix[tup[1]]
     dc = t_dict(clip.drop('geometry').to_dict())
     a = gdf.loc[tup[0]].geometry
@@ -62,6 +69,9 @@ def mashGeoms(gdf,tup):
     return gdf.append(new).sort_index()
 
 def fixOverlap(f,col):
+	'''Clips out overlapping geometries within a shapefile
+	ranked by an attribute.
+	'''
     shp = gpd.read_file(f)
     shp.sort_values(col,0,False,True)
     shp.reset_index(drop=True,inplace=True)
