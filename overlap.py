@@ -1,11 +1,3 @@
-#!/usr/bin/env python2
-# -*- coding: utf-8 -*-
-"""
-Created on Thu May 25 00:41:33 2017
-
-@author: rick
-"""
-
 import geopandas as gpd
 from shapely.geometry import MultiPolygon
 
@@ -82,16 +74,8 @@ def fixOverlap(f,col):
 
 if __name__ == '__main__':
     
-    loc ='/home/rick/projects/overlapTopoTool'
+    loc ='/path/to/shapefile'
     fn = '%s/overlapping.shp' % loc
     column = 'NUM_IMAGES'
     out = fixOverlap(fn,column)
     out.to_file('%s/test.shp' % loc)
-
-#one = mashGeoms(shp,iss[0])
-#two = mashGeoms(one,iss[1])
-#thr = mashGeoms(two,iss[2])
-#fou = mashGeoms(thr,iss[3])
-#fiv = mashGeoms(fou,iss[4])
-#gdf = fiv.copy()
-#tup = iss[5]
