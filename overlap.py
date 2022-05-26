@@ -1,7 +1,6 @@
 from itertools import combinations
 
 import geopandas as gpd
-import pandas as pd
 from shapely.geometry import MultiPolygon
 
 
@@ -37,9 +36,10 @@ def mashGeoms(gdf, tup):
     """Modifies the overlapping geometries within the GeoDataFrame
     at the indexes passed into tup.
     """
-    clip = gdf.loc[tup[1]]
-    dc = t_dict(clip.drop("geometry").to_dict())
-    a = gdf.loc[tup[0]].geometry
+    greater, lesser = tup
+    clip = gdf.loc[lesser]
+    # dc = t_dict(clip.drop("geometry").to_dict())
+    a = gdf.loc[greater].geometry
     b = clip.geometry
     tt1 = type(a) == type(MultiPolygon())
     tt2 = type(b) == type(MultiPolygon())
@@ -61,9 +61,7 @@ def mashGeoms(gdf, tup):
                 m = clipGeoms(n, m)
             polys.append(m)
         clipd = MultiPolygon(polys)
-    gdf.drop(tup[1], inplace=True)
-    new = gpd.GeoDataFrame(dc, index=[tup[1]], geometry=[clipd], crs=gdf.crs)
-    return pd.concat([gdf, new]).sort_index()
+    gdf.loc[lesser, 'geometry'] = clipd
 
 
 def fixOverlap(f, col):
@@ -73,20 +71,16 @@ def fixOverlap(f, col):
     shp = gpd.read_file(f)
     shp.sort_values(by=col, axis=0, ascending=False, inplace=True)
     shp.reset_index(drop=True, inplace=True)
-    iss = find_overlaps(shp)
-    for x in iss:
-        shp = mashGeoms(shp, x)
-    return shp.reset_index(drop=True)
+    overlaps = find_overlaps(shp)
+    for overlap in overlaps:
+        mashGeoms(shp, overlap)
+    return shp
 
 
 if __name__ == "__main__":
 
-    loc = "."
-    fn = "%s/circles.shp" % loc
+    loc = "/home/rick/dev/overlapTopoTool"
+    fn = f"{loc}/circles.shp"
     column = "WEIGHT"
     out = fixOverlap(fn, column)
-    out.to_file("%s/test.shp" % loc)
-
-
-# /home/rick/.miniconda3/envs/gis/lib/python3.10/site-packages/geopandas/io/file.py:362: FutureWarning: pandas.Int64Index is deprecated and will be removed from pandas in a future version. Use pandas.Index with the appropriate dtype instead.
-#   pd.Int64Index,
+    out.to_file(f"{loc}/test.shp")
