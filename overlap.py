@@ -3,6 +3,8 @@ from itertools import combinations
 import geopandas as gpd
 from shapely.geometry import MultiPolygon
 
+MP = type(MultiPolygon())
+
 
 def find_overlaps(gdf):
     """Returns a list of tuples idntifying the geometries
@@ -17,51 +19,36 @@ def find_overlaps(gdf):
     return overlaps
 
 
-def t_dict(d):
-    """Creates a dictionary to pass to the GeoDataFrame instantiation 
-    """
-    g = {}
-    for k in d:
-        g[k] = [d[k]]
-    return g
-
-
 def clipGeoms(geom1, geom2):
-    """Returns a clipped version of geom 2
+    """Returns a clipped version of geom2
     """
     return geom2.difference(geom1)
 
 
-def mashGeoms(gdf, tup):
-    """Modifies the overlapping geometries within the GeoDataFrame
-    at the indexes passed into tup.
+def clip_geometries(hi_geom, lo_geom):
+    """clips the `lo_geom` to the `hi-geom` and handles Multipolygon
+    issues. Returns the updated geometry for `lo_geom`.
     """
-    greater, lesser = tup
-    clip = gdf.loc[lesser]
-    # dc = t_dict(clip.drop("geometry").to_dict())
-    a = gdf.loc[greater].geometry
-    b = clip.geometry
-    tt1 = type(a) == type(MultiPolygon())
-    tt2 = type(b) == type(MultiPolygon())
-    if not tt1 and not tt2:
-        clipd = clipGeoms(a, b)
-    if not tt1 and tt2:
+    if not type(hi_geom) == MP and not type(lo_geom) == MP:
+        return clipGeoms(hi_geom, lo_geom)
+    if not type(hi_geom) == MP and type(lo_geom) == MP:
         polys = []
-        for m in b:
-            polys.append(clipGeoms(a, m))
-        clipd = MultiPolygon(polys)
-    if tt1 and not tt2:
-        for n in a:
-            b = clipGeoms(n, b)
-        clipd = b
-    if tt1 and tt2:
+        for g in lo_geom:
+            polys.append(clipGeoms(hi_geom, g))
+        return MultiPolygon(polys)
+    if type(hi_geom) == MP and not type(lo_geom) == MP:
+        # clip by every geometry in the MultiPolygon
+        for g in hi_geom:
+            lo_geom = clipGeoms(g, lo_geom)
+        return lo_geom
+    if type(hi_geom) == MP and type(lo_geom) == MP:
         polys = []
-        for m in b:
-            for n in a:
-                m = clipGeoms(n, m)
-            polys.append(m)
-        clipd = MultiPolygon(polys)
-    gdf.loc[lesser, 'geometry'] = clipd
+        # clip each geom in the `lo_geom` by each geom in the `hi_geom`
+        for g in lo_geom:
+            for gg in hi_geom:
+                g = clipGeoms(gg, g)
+            polys.append(g)
+        return MultiPolygon(polys)
 
 
 def fixOverlap(f, col):
@@ -69,18 +56,22 @@ def fixOverlap(f, col):
     ranked by an attribute.
     """
     shp = gpd.read_file(f)
+    shp = shp.loc[~shp.geometry.duplicated()]
+    # shp.geometry.drop_duplicates(inplace=True)
     shp.sort_values(by=col, axis=0, ascending=False, inplace=True)
     shp.reset_index(drop=True, inplace=True)
     overlaps = find_overlaps(shp)
-    for overlap in overlaps:
-        mashGeoms(shp, overlap)
+    for h_idx, l_idx in overlaps:
+        greater = shp.loc[h_idx].geometry
+        lesser = shp.loc[l_idx].geometry
+        shp.loc[l_idx, "geometry"] = clip_geometries(greater, lesser)
     return shp
 
 
 if __name__ == "__main__":
 
     loc = "/home/rick/dev/overlapTopoTool"
-    fn = f"{loc}/circles.shp"
-    column = "WEIGHT"
+    fn = f"{loc}/niwo010_treepolys/niwo010_treepolys.shp"
+    column = "height"
     out = fixOverlap(fn, column)
     out.to_file(f"{loc}/test.shp")
