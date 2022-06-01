@@ -64,14 +64,16 @@ def fixOverlap(f, col):
     for h_idx, l_idx in overlaps:
         greater = shp.loc[h_idx].geometry
         lesser = shp.loc[l_idx].geometry
-        shp.loc[l_idx, "geometry"] = clip_geometries(greater, lesser)
+        clipped_geometry = gpd.GeoSeries([clip_geometries(greater, lesser)])
+        shp.loc[[l_idx], "geometry"] = clipped_geometry.values 
     return shp
 
 
 if __name__ == "__main__":
 
     loc = "/home/rick/dev/overlapTopoTool"
-    fn = f"{loc}/niwo010_treepolys/niwo010_treepolys.shp"
-    column = "height"
+    # fn = f"{loc}/niwo010_treepolys/niwo010_treepolys.shp"
+    fn = f"{loc}/circles.shp"
+    column = "WEIGHT"
     out = fixOverlap(fn, column)
     out.to_file(f"{loc}/test.shp")
