@@ -20,8 +20,7 @@ def find_overlaps(gdf):
 
 
 def clipGeoms(geom1, geom2):
-    """Returns a clipped version of geom2
-    """
+    """Returns a clipped version of geom2"""
     return geom2.difference(geom1)
 
 
@@ -65,7 +64,7 @@ def fixOverlap(f, col):
         greater = shp.loc[h_idx].geometry
         lesser = shp.loc[l_idx].geometry
         clipped_geometry = gpd.GeoSeries([clip_geometries(greater, lesser)])
-        shp.loc[[l_idx], "geometry"] = clipped_geometry.values 
+        shp.loc[[l_idx], "geometry"] = clipped_geometry.values
     return shp
 
 
