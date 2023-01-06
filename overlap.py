@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Thu Jan  5 20:17:40 2023
-
-@author: rick
-"""
-
 from itertools import combinations
 
 import click
@@ -32,40 +24,14 @@ def find_overlaps(gdf):
 
 def clipGeoms(geom1, geom2):
     """Returns a clipped version of geom2"""
-    return geom2.difference(geom1)
+    glo = geom2.difference(geom1)
+    ghi = snap(geom1, glo, 1)
+    return ghi, glo
 
-
-def clip_geometries(hi_geom, lo_geom):
-    """clips the `lo_geom` to the `hi-geom` and handles Multipolygon
-    issues. Returns the updated geometry for `lo_geom`.
-    """
-    # breakpoint()
-    if not type(hi_geom) == MP and not type(lo_geom) == MP:
-        new = clipGeoms(hi_geom, lo_geom)
-        return snap(hi_geom, new, 1) , new
-    if not type(hi_geom) == MP and type(lo_geom) == MP:
-        polys = []
-        for g in lo_geom.geoms:
-            polys.append(clipGeoms(hi_geom, g))
-        new = MultiPolygon(polys)
-        return snap(hi_geom, new, 1) , new
-    if type(hi_geom) == MP and not type(lo_geom) == MP:
-        # clip by every geometry in the MultiPolygon
-        for g in hi_geom.geoms:
-            lo_geom = clipGeoms(g, lo_geom)
-        new = lo_geom
-        return snap(hi_geom, new, 1) , new
-    if type(hi_geom) == MP and type(lo_geom) == MP:
-        polys = []
-        # clip each geom in the `lo_geom` by each geom in the `hi_geom`
-        for g in lo_geom.geoms:
-            for gg in hi_geom.geoms:
-                g = clipGeoms(gg, g)
-            polys.append(g)
-        new = MultiPolygon(polys)
-        return snap(hi_geom, new, 1) , new
         
-
+def iterate_overlaps(gdf, overlaps):
+    for hi, lo in overlaps:
+        yield (hi, gdf.loc[hi].geometry), (lo, gdf.loc[lo].geometry)
 
 def fixOverlap(f, col):
     """Clips out overlapping geometries within a shapefile
@@ -77,17 +43,13 @@ def fixOverlap(f, col):
     shp.sort_values(by=col, axis=0, ascending=False, inplace=True)
     shp.reset_index(drop=True, inplace=True)
     overlaps = find_overlaps(shp)
-    for h_idx, l_idx in overlaps:
-        greater = shp.loc[h_idx].geometry
-        lesser = shp.loc[l_idx].geometry
-        hi_clip, lo_clip = clip_geometries(greater, lesser)
-        shp.loc[[l_idx], "geometry"] = lo_clip
-        shp.loc[[h_idx], "geometry"] = hi_clip
-    for h_idx, l_idx in overlaps:
-        greater = shp.loc[h_idx].geometry
-        lesser = shp.loc[l_idx].geometry
-        shp.loc[[h_idx], "geometry"] = snap(greater, lesser, 1)
-        shp.loc[[l_idx], "geometry"] = snap(lesser, greater, 1)
+    for (hi, greater), (lo, lesser) in iterate_overlaps(shp, overlaps):
+        hi_clip, lo_clip = clipGeoms(greater, lesser)
+        shp.loc[[lo], "geometry"] = lo_clip
+        shp.loc[[hi], "geometry"] = hi_clip
+    for (hi, greater), (lo, lesser) in iterate_overlaps(shp, overlaps):
+        shp.loc[[hi], "geometry"] = snap(greater, lesser, 1)
+        shp.loc[[lo], "geometry"] = snap(lesser, greater, 1)
     return shp
 
 
@@ -100,5 +62,4 @@ if __name__ == "__main__":
     # column = "WEIGHT"
     column = "weight"
     out = fixOverlap(fn, column)
-    out.to_file(f"{loc}/test5.gpkg", driver="GPKG")
-
+    out.to_file(f"{loc}/test7.gpkg", driver="GPKG")
