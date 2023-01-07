@@ -1,65 +1,52 @@
 from itertools import combinations
 
-import click
 import geopandas as gpd
 from shapely.ops import snap
-from shapely.geometry import MultiPolygon
-
-MP = type(MultiPolygon())
 
 
 def find_overlaps(gdf):
     """Returns a list of tuples identifying the geometries
     that overlap one another.
     """
-    # breakpoint()
-    overlaps = []
+    overlaps, retouch = [], {}
     for x, y in combinations(gdf.index.tolist(), 2):
-        x_geom = gdf.loc[x].geometry.exterior
-        y_geom = gdf.loc[y].geometry.exterior
-        if x_geom.crosses(y_geom):
-            overlaps.append((x, y))
-    return overlaps
+        g_x = gdf.loc[x].geometry
+        g_y = gdf.loc[y].geometry
+        if g_x.intersects(g_y):
+            overlaps.append([x, y])
+
+    for t, b in overlaps:
+        retouch.setdefault(t, []).append(b)
+
+    return overlaps, retouch
 
 
-def clipGeoms(geom1, geom2):
-    """Returns a clipped version of geom2"""
-    glo = geom2.difference(geom1)
-    ghi = snap(geom1, glo, 1)
-    return ghi, glo
-
-        
-def iterate_overlaps(gdf, overlaps):
-    for hi, lo in overlaps:
-        yield (hi, gdf.loc[hi].geometry), (lo, gdf.loc[lo].geometry)
-
-def fixOverlap(f, col):
+def clip_overlaps_by_weight(gdf, col, tol=0.0000001):
     """Clips out overlapping geometries within a shapefile
     ranked by an attribute.
     """
-    shp = gpd.read_file(f)
-    shp = shp.loc[~shp.geometry.duplicated()]
-    # shp.geometry.drop_duplicates(inplace=True)
-    shp.sort_values(by=col, axis=0, ascending=False, inplace=True)
-    shp.reset_index(drop=True, inplace=True)
-    overlaps = find_overlaps(shp)
-    for (hi, greater), (lo, lesser) in iterate_overlaps(shp, overlaps):
-        hi_clip, lo_clip = clipGeoms(greater, lesser)
-        shp.loc[[lo], "geometry"] = lo_clip
-        shp.loc[[hi], "geometry"] = hi_clip
-    for (hi, greater), (lo, lesser) in iterate_overlaps(shp, overlaps):
-        shp.loc[[hi], "geometry"] = snap(greater, lesser, 1)
-        shp.loc[[lo], "geometry"] = snap(lesser, greater, 1)
-    return shp
 
+    gdf.sort_values(by=col, axis=0, ascending=False, inplace=True)
+    gdf.reset_index(inplace=True)
+    dupd = gdf.geometry.duplicated()
+    if dupd.any():  # keep highest weighted duplicate, remove the rest
+        gdf = gdf.loc[~dupd]
 
-if __name__ == "__main__":
+    overlaps, retouch = find_overlaps(gdf)
 
-    loc = "/home/rick/dev/overlapTopoTool"
-    # fn = f"{loc}/niwo010_treepolys/niwo010_treepolys.shp"
-    # fn = f"{loc}/circles.shp"
-    fn = f"{loc}/original_shapes.gpkg"
-    # column = "WEIGHT"
-    column = "weight"
-    out = fixOverlap(fn, column)
-    out.to_file(f"{loc}/test7.gpkg", driver="GPKG")
+    for overlap in overlaps:
+        print(gdf.loc[overlap])
+        top, bot = gdf.loc[overlap].geometry
+        try:
+            bot = bot.difference(top)
+        except:
+            breakpoint()
+        top = snap(top, bot, tol)
+        gdf.loc[overlap, "geometry"] = gpd.GeoSeries([top, bot], index=overlap)
+
+    for clipper, clip_list in retouch.items():
+        for clipped in clip_list[:-1]:
+            top, bot = gdf.loc[[clipper, clipped]].geometry
+            gdf.loc[clipped, "geometry"] = snap(bot, top, tol)
+
+    return gdf.sort_values(by="index").drop("index", axis=1)
